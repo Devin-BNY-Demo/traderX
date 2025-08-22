@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriUtils;
+import java.nio.charset.StandardCharsets;
 
 import finos.traderx.messaging.PubSubException;
 import finos.traderx.messaging.Publisher;
@@ -67,19 +69,26 @@ public class TradeOrderController {
 
 	private boolean validateTicker(String ticker)
 	{
+		if (ticker == null || ticker.trim().isEmpty() || 
+			!ticker.matches("^[A-Za-z0-9._-]+$") || ticker.length() > 20) {
+			log.warn("Invalid ticker format provided");
+			return false;
+		}
+		
 		// Move whole method to a sperate class that handles all reference data 
 		// so we can mock it and run without this service up.
-		String url = this.referenceDataServiceAddress + "//stocks/" + ticker;
+		String url = this.referenceDataServiceAddress + "/stocks/" + 
+					UriUtils.encodePathSegment(ticker, StandardCharsets.UTF_8);
 		ResponseEntity<Security> response = null;
 
 		try {
 			response = this.restTemplate.getForEntity(url, Security.class);
-			log.info("Validate ticker " + response.getBody().toString());
+			log.info("Validate ticker {}", ticker);
 			return true;
 		}
 		catch (HttpClientErrorException ex) {
 			if (ex.getRawStatusCode() == 404) {
-				log.info(ticker + " not found in reference data service.");
+				log.info("Ticker {} not found in reference data service.", ticker);
 			}
 			else {
 				log.error(ex.getMessage());
@@ -99,12 +108,12 @@ public class TradeOrderController {
 		try 
 		{
 				response = this.restTemplate.getForEntity(url, Account.class);
-				log.info("Validate account " + response.getBody().toString());
+				log.info("Validate account {}", response.getBody().toString());
 				return true;
 		}
 		catch (HttpClientErrorException ex) {
 			if (ex.getRawStatusCode() == 404) {
-				log.info("Account" + id + " not found in account service.");				
+				log.info("Account {} not found in account service.", id);				
 			}
 			else {
 				log.error(ex.getMessage());
