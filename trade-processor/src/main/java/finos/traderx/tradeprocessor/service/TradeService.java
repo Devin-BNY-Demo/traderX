@@ -33,7 +33,9 @@ public class TradeService {
     private Publisher<Position> positionPublisher;
     
 	public TradeBookingResult processTrade(TradeOrder order) {
-		log.info("Trade order received : "+order);
+		log.info("Trade order received with accountId: {} and security: {}", 
+				sanitizeForLogging(order.getAccountId()), 
+				sanitizeForLogging(order.getSecurity()));
         Trade t=new Trade();
         t.setAccountId(order.getAccountId());
 
@@ -48,9 +50,14 @@ public class TradeService {
         t.setQuantity(order.getQuantity());
 		t.setState(TradeState.New);
 		Position position=positionRepository.findByAccountIdAndSecurity(order.getAccountId(), order.getSecurity());
-		log.info("Position for "+order.getAccountId()+" "+order.getSecurity()+" is "+position);
+		log.info("Position for accountId: {} security: {} is: {}", 
+				sanitizeForLogging(order.getAccountId()), 
+				sanitizeForLogging(order.getSecurity()), 
+				sanitizeForLogging(position));
 		if(position==null) {
-			log.info("Creating new position for "+order.getAccountId()+" "+order.getSecurity());
+			log.info("Creating new position for accountId: {} security: {}", 
+					sanitizeForLogging(order.getAccountId()), 
+					sanitizeForLogging(order.getSecurity()));
 			position=new Position();
 			position.setAccountId(order.getAccountId());
 			position.setSecurity(order.getSecurity());
@@ -72,9 +79,9 @@ public class TradeService {
 		
 
 		TradeBookingResult result=new TradeBookingResult(t, position);
-		log.info("Trade Processing complete : "+result);
+		log.info("Trade Processing complete for trade: {}", sanitizeForLogging(result));
 		try{
-			log.info("Publishing : "+result);
+			log.info("Publishing trade result: {}", sanitizeForLogging(result));
 			tradePublisher.publish("/accounts/"+order.getAccountId()+"/trades", result.getTrade());
 			positionPublisher.publish("/accounts/"+order.getAccountId()+"/positions", result.getPosition());
 		} catch (PubSubException exc){
@@ -82,6 +89,14 @@ public class TradeService {
 		}
 		
 		return result;	
+	}
+
+	private String sanitizeForLogging(Object input) {
+		if (input == null) return "null";
+		String str = input.toString();
+		return str.replaceAll("[\\r\\n\\t]", "_")
+				  .replaceAll("[^\\w\\s.,-]", "")
+				  .substring(0, Math.min(str.length(), 100));
 	}
 
 }
